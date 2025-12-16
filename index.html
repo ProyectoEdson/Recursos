@@ -6,11 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
+
     <style>
         body { background-color: #0d1117; color: #e6edf3; font-family: sans-serif; padding: 20px; }
-        h1 { text-align: center; color: #58a6ff; margin-bottom: 10px; }
-        h3 { text-align: center; color: #8b949e; font-weight: normal; margin-top: 0; }
+        h1 { text-align: center; color: #58a6ff; margin-bottom: 5px; }
+        h3 { text-align: center; color: #8b949e; font-weight: normal; margin-top: 0; margin-bottom: 30px; }
 
         /* CONTENEDOR PRINCIPAL */
         .dashboard { max-width: 1100px; margin: 0 auto; }
@@ -22,20 +22,31 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
-        /* GRID DE TARJETAS SELECTORAS */
-        .cards-grid { 
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
-            gap: 20px; 
+        /* GRID DE TARJETAS (Ahora con datos) */
+        .cards-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
         }
 
         .mini-card {
-            background: #21262d; border: 1px solid #30363d; border-radius: 8px;
-            padding: 15px; cursor: pointer; text-align: center;
-            transition: all 0.2s;
+            background: #21262d; border: 1px solid #30363d; border-radius: 12px;
+            padding: 20px; cursor: pointer; text-align: left;
+            transition: all 0.2s; position: relative;
+            overflow: hidden;
         }
         .mini-card:hover { transform: translateY(-5px); border-color: #58a6ff; background: #30363d; }
-        .vm-name { font-weight: bold; font-size: 1.1em; color: #fff; display: block; margin-bottom: 5px; }
-        .vm-status { font-size: 0.9em; color: #2ea043; } /* Verde por defecto */
+
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #484f58; padding-bottom: 10px; }
+        .vm-name { font-weight: bold; font-size: 1.2em; color: #fff; }
+        .live-dot { height: 10px; width: 10px; background-color: #2ea043; border-radius: 50%; box-shadow: 0 0 5px #2ea043; }
+
+        /* DATOS EN TEXTO */
+        .stats-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95em; }
+        .stat-label { color: #8b949e; }
+        .stat-val { font-weight: bold; font-family: monospace; font-size: 1.1em; }
+
+        /* Pequeño texto de ayuda */
+        .click-hint { font-size: 0.75em; text-align: center; color: #58a6ff; margin-top: 15px; opacity: 0.7; }
 
         /* MODAL DE DETALLE */
         #modal {
@@ -48,8 +59,9 @@
             border-radius: 15px; border: 1px solid #58a6ff; position: relative;
         }
         .close-btn { position: absolute; top: 15px; right: 20px; font-size: 2em; cursor: pointer; color: #8b949e; }
-        
-        /* BARRA DE DISCO */
+        .close-btn:hover { color: #ff7b72; }
+
+        /* BARRA DE DISCO EN MODAL */
         .disk-bar-bg { background: #30363d; height: 15px; border-radius: 10px; margin-top: 5px; overflow: hidden; }
         .disk-bar-fill { height: 100%; background: #a371f7; width: 0%; transition: width 1s; }
 
@@ -57,193 +69,219 @@
 </head>
 <body>
 
-    <div class="dashboard">
-        <h1>🔭 CENTRO DE CONTROL</h1>
-        <h3>Comparativa de Rendimiento CPU en Tiempo Real</h3>
+<div class="dashboard">
+    <h1>🔭 CENTRO DE CONTROL</h1>
+    <h3>Infraestructura de Servidores en Tiempo Real</h3>
 
-        <div class="main-chart-container">
-            <canvas id="globalChart"></canvas>
-        </div>
-
-        <h3 style="text-align: left; border-bottom: 1px solid #30363d; padding-bottom: 10px;">
-            👇 Selecciona una VM para ver RAM y Disco
-        </h3>
-        <div id="cards-container" class="cards-grid">
-            <p>Buscando señales...</p>
-        </div>
+    <div class="main-chart-container">
+        <h4 style="margin:0 0 15px 0; color:#8b949e;">Comparativa de Carga (CPU)</h4>
+        <canvas id="globalChart"></canvas>
     </div>
 
-    <div id="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="cerrarModal()">&times;</span>
-            <h2 id="modal-title" style="color:#58a6ff">Detalle VM</h2>
-            
-            <div style="height: 300px;">
-                <canvas id="detailChart"></canvas>
-            </div>
+    <h4 style="color:#8b949e; border-bottom: 1px solid #30363d; padding-bottom: 10px;">
+        Estado Actual de Máquinas
+    </h4>
+    <div id="cards-container" class="cards-grid">
+        <p>Conectando con satélites...</p>
+    </div>
+</div>
 
-            <div style="margin-top: 20px;">
-                <label>💿 Uso de Disco Duro:</label>
-                <div class="disk-bar-bg">
-                    <div id="disk-fill" class="disk-bar-fill"></div>
-                </div>
-                <div id="disk-text" style="text-align: right; font-size: 0.9em; margin-top: 5px;">0%</div>
+<div id="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="cerrarModal()">&times;</span>
+        <h2 id="modal-title" style="color:#58a6ff; margin-top:0;">Detalle VM</h2>
+
+        <div style="height: 300px;">
+            <canvas id="detailChart"></canvas>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <label>💿 Almacenamiento:</label>
+            <div class="disk-bar-bg">
+                <div id="disk-fill" class="disk-bar-fill"></div>
             </div>
+            <div id="disk-text" style="text-align: right; font-size: 0.9em; margin-top: 5px; color:#8b949e;">Calculating...</div>
         </div>
     </div>
+</div>
 
-    <script>
-        // --- TUS CREDENCIALES ---
-        const SB_URL = "https://yzumpycvoouplizzgxid.supabase.co"
-        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6dW1weWN2b291cGxpenpneGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5MTI4OTYsImV4cCI6MjA4MTQ4ODg5Nn0.G9KSUWz9CtQIVs7VUwkY8BvJ1LRV9QI9-V_23m2jKGI"
+<script>
+    // --- TUS CREDENCIALES (¡PONLAS AQUÍ!) ---
+    const SB_URL = "https://yzumpycvoouplizzgxid.supabase.co"
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6dW1weWN2b291cGxpenpneGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5MTI4OTYsImV4cCI6MjA4MTQ4ODg5Nn0.G9KSUWz9CtQIVs7VUwkY8BvJ1LRV9QI9-V_23m2jKGI"
 
-        const { createClient } = supabase
-        const client = createClient(SB_URL, SB_KEY)
+    const { createClient } = supabase
+    const client = createClient(SB_URL, SB_KEY)
 
-        let globalChartRef = null;
-        let detailChartRef = null;
-        let allData = [];
+    let globalChartRef = null;
+    let detailChartRef = null;
+    let allData = [];
 
-        // Colores para las líneas (Fedora, Debian, Ubuntu)
-        const COLORS = ['#ff7b72', '#2f81f7', '#2ea043', '#d2a8ff'];
+    // Colores corregidos :)
+    const COLORS = ['#ff7b72', '#2f81f7', '#2ea043', '#d2a8ff'];
 
-        async function updateDashboard() {
-            // Traemos los últimos 100 registros globales
-            const { data, error } = await client
-                .from('metricas')
-                .select('*')
-                .order('created_at', { ascending: true }) // Orden cronológico para la gráfica
-                .limit(300) 
+    async function updateDashboard() {
+        // Traemos los últimos 300 registros
+        const { data, error } = await client
+            .from('metricas')
+            .select('*')
+            .order('created_at', { ascending: true })
+            .limit(300)
 
-            if (error) return console.error(error);
-            allData = data;
+        if (error) return console.error(error);
+        allData = data;
 
-            dibujarGlobalChart(data);
-            dibujarTarjetas(data);
-        }
+        dibujarGlobalChart(data);
+        dibujarTarjetas(data);
+    }
 
-        // --- 1. DIBUJAR GRÁFICA COMPARATIVA (SOLO CPU) ---
-        function dibujarGlobalChart(data) {
-            const ctx = document.getElementById('globalChart').getContext('2d');
-            
-            // Agrupar datos por VM
-            const vms = [...new Set(data.map(d => d.nombre_vm))];
-            const datasets = vms.map((vmName, i) => {
-                const vmData = data.filter(d => d.nombre_vm === vmName);
-                return {
-                    label: vmName,
-                    data: vmData.map(d => ({ x: new Date(d.created_at).toLocaleTimeString(), y: d.cpu })),
-                    borderColor: COLORS[i % COLORS.length],
-                    backgroundColor: 'transparent',
-                    tension: 0.3,
-                    pointRadius: 2
-                }
-            });
+    // --- 1. GRÁFICA COMPARATIVA ---
+    function dibujarGlobalChart(data) {
+        const ctx = document.getElementById('globalChart').getContext('2d');
+        const vms = [...new Set(data.map(d => d.nombre_vm))];
 
-            // Usamos las etiquetas de tiempo del primer dataset como referencia (o generamos una escala simple)
-            const labels = data.filter(d => d.nombre_vm === vms[0]).map(d => new Date(d.created_at).toLocaleTimeString());
+        const datasets = vms.map((vmName, i) => {
+            const vmData = data.filter(d => d.nombre_vm === vmName);
+            return {
+                label: vmName,
+                data: vmData.map(d => ({ x: new Date(d.created_at).toLocaleTimeString(), y: d.cpu })),
+                borderColor: COLORS[i % COLORS.length],
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                tension: 0.3,
+                pointRadius: 0, // Línea limpia sin puntos
+                pointHoverRadius: 6
+            }
+        });
 
-            if (globalChartRef) globalChartRef.destroy();
+        // Eje X basado en tiempo
+        const labels = data.filter(d => d.nombre_vm === vms[0]).map(d => new Date(d.created_at).toLocaleTimeString());
 
-            globalChartRef = new Chart(ctx, {
-                type: 'line',
-                data: { labels: labels, datasets: datasets },
-                options: {
-                    responsive: true,
-                    interaction: { mode: 'index', intersect: false }, // Muestra tooltip de todas las lineas a la vez
-                    scales: {
-                        y: { beginAtZero: true, title: { display: true, text: 'CPU %' } },
-                        x: { display: false } // Ocultamos texto eje X para limpieza
-                    },
-                    plugins: {
-                        title: { display: true, text: 'Comparativa de Esfuerzo (CPU)' }
-                    }
-                }
-            });
-        }
+        if (globalChartRef) globalChartRef.destroy();
 
-        // --- 2. DIBUJAR LOS BOTONES (TARJETAS) ---
-        function dibujarTarjetas(data) {
-            const container = document.getElementById('cards-container');
-            const uniqueVMs = {};
-            
-            // Obtener el último dato de cada VM
-            data.forEach(d => uniqueVMs[d.nombre_vm] = d); // Al recorrer en orden, el ultimo sobrescribe
-            
-            let html = '';
-            Object.values(uniqueVMs).forEach(vm => {
-                html += `
+        globalChartRef = new Chart(ctx, {
+            type: 'line',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, max: 100, grid: { color: '#30363d' } },
+                    x: { display: false }
+                },
+                plugins: { legend: { labels: { color: '#e6edf3' } } }
+            }
+        });
+    }
+
+    // --- 2. DIBUJAR TARJETAS CON DATOS ---
+    function dibujarTarjetas(data) {
+        const container = document.getElementById('cards-container');
+        const uniqueVMs = {};
+
+        // Obtener el último dato
+        data.forEach(d => uniqueVMs[d.nombre_vm] = d);
+
+        let html = '';
+        Object.values(uniqueVMs).forEach(vm => {
+            // Colores de alerta
+            const cpuColor = vm.cpu > 80 ? '#ff7b72' : '#e6edf3';
+            const ramColor = vm.ram > 90 ? '#ff7b72' : '#e6edf3';
+
+            html += `
                 <div class="mini-card" onclick="abrirModal('${vm.nombre_vm}')">
-                    <span class="vm-name">🖥️ ${vm.nombre_vm}</span>
-                    <div style="margin-top:5px; font-size:0.9em; color:#8b949e">Clic para detalles</div>
+                    <div class="card-header">
+                        <span class="vm-name">🖥️ ${vm.nombre_vm}</span>
+                        <span class="live-dot"></span>
+                    </div>
+
+                    <div class="stats-row">
+                        <span class="stat-label">🧠 CPU:</span>
+                        <span class="stat-val" style="color:${cpuColor}">${vm.cpu}%</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stat-label">💾 RAM:</span>
+                        <span class="stat-val" style="color:${ramColor}">${vm.ram}%</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stat-label">💿 Disco:</span>
+                        <span class="stat-val">${vm.disco}%</span>
+                    </div>
+
+                    <div class="click-hint">👆 Ver historial detallado</div>
                 </div>
                 `;
-            });
-            container.innerHTML = html;
-        }
+        });
+        container.innerHTML = html;
+    }
 
-        // --- 3. ABRIR DETALLE (CPU + RAM + DISCO) ---
-        function abrirModal(vmName) {
-            const modal = document.getElementById('modal');
-            modal.style.display = 'flex';
-            document.getElementById('modal-title').innerText = vmName;
+    // --- 3. ABRIR DETALLE ---
+    function abrirModal(vmName) {
+        const modal = document.getElementById('modal');
+        modal.style.display = 'flex';
+        document.getElementById('modal-title').innerText = vmName;
 
-            // Filtrar datos de ESTA vm
-            const vmData = allData.filter(d => d.nombre_vm === vmName);
-            const ultimoDato = vmData[vmData.length - 1];
+        const vmData = allData.filter(d => d.nombre_vm === vmName);
+        const ultimoDato = vmData[vmData.length - 1];
 
-            // A. Actualizar Barra de Disco
-            const disco = ultimoDato.disco;
-            document.getElementById('disk-fill').style.width = disco + '%';
-            document.getElementById('disk-text').innerText = disco + '% Ocupado / ' + (100 - disco).toFixed(1) + '% Libre';
-            
-            // Color de la barra según uso
-            const barra = document.getElementById('disk-fill');
-            if(disco < 50) barra.style.background = '#2ea043'; // Verde
-            else if(disco < 80) barra.style.background = '#e3b341'; // Amarillo
-            else barra.style.background = '#ff7b72'; // Rojo
+        // Barra Disco
+        const disco = ultimoDato.disco;
+        const barra = document.getElementById('disk-fill');
+        barra.style.width = disco + '%';
+        document.getElementById('disk-text').innerText = disco + '% Ocupado';
 
-            // B. Dibujar Gráfica Mixta (CPU vs RAM)
-            const ctx = document.getElementById('detailChart').getContext('2d');
-            if (detailChartRef) detailChartRef.destroy();
+        if(disco < 60) barra.style.background = '#2ea043';
+        else if(disco < 85) barra.style.background = '#e3b341';
+        else barra.style.background = '#ff7b72';
 
-            detailChartRef = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: vmData.map(d => new Date(d.created_at).toLocaleTimeString()),
-                    datasets: [
-                        {
-                            label: 'CPU %',
-                            data: vmData.map(d => d.cpu),
-                            borderColor: '#ff7b72',
-                            tension: 0.4,
-                            fill: true,
-                            backgroundColor: 'rgba(255, 123, 114, 0.1)'
-                        },
-                        {
-                            label: 'RAM %',
-                            data: vmData.map(d => d.ram),
-                            borderColor: '#2f81f7',
-                            borderDash: [5, 5], // Línea punteada
-                            tension: 0.4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: { y: { beginAtZero: true, max: 100 } }
-                }
-            });
-        }
+        // Gráfica Detalle
+        const ctx = document.getElementById('detailChart').getContext('2d');
+        if (detailChartRef) detailChartRef.destroy();
 
-        function cerrarModal() {
-            document.getElementById('modal').style.display = 'none';
-        }
+        detailChartRef = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: vmData.map(d => new Date(d.created_at).toLocaleTimeString()),
+                datasets: [
+                    {
+                        label: 'CPU %',
+                        data: vmData.map(d => d.cpu),
+                        borderColor: '#ff7b72',
+                        tension: 0.4,
+                        fill: true,
+                        backgroundColor: 'rgba(255, 123, 114, 0.1)'
+                    },
+                    {
+                        label: 'RAM %',
+                        data: vmData.map(d => d.ram),
+                        borderColor: '#2f81f7',
+                        borderDash: [5, 5],
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, max: 100, grid: { color: '#30363d' } }, x: { display: false } },
+                plugins: { legend: { labels: { color: '#e6edf3' } } }
+            }
+        });
+    }
 
-        // Refrescar cada 5 segundos
-        setInterval(updateDashboard, 5000);
-        updateDashboard();
+    function cerrarModal() {
+        document.getElementById('modal').style.display = 'none';
+    }
 
-    </script>
+    window.onclick = function(e) {
+        if (e.target == document.getElementById('modal')) cerrarModal();
+    }
+
+    // Refrescar cada 5 segundos
+    setInterval(updateDashboard, 5000);
+    updateDashboard();
+
+</script>
 </body>
 </html>
