@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard Semestral PRO</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .stats-grid { display: flex; gap: 20px; margin-bottom: 20px; }
+        .card { background: #2a2a2a; padding: 20px; border-radius: 10px; flex: 1; text-align: center; border: 1px solid #444; }
+        .num { font-size: 2em; font-weight: bold; color: #4bc0c0; }
+        canvas { background: #222; border-radius: 10px; padding: 10px; }
+        button { background: #4bc0c0; border: none; padding: 10px 20px; color: white; border-radius: 5px; cursor: pointer; font-size: 1em; }
+        button:hover { background: #3aa3a3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Monitor de Recursos en la Nube</h1>
+        
+        <div class="stats-grid" id="promedios">
+            <div class="card">Cargando promedios...</div>
+        </div>
+
+        <button onclick="cargarDatos()">🔄 Actualizar Datos</button>
+        
+        <div style="margin-top: 20px;">
+            <canvas id="miGrafica"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // --- TUS CREDENCIALES ---
+        const SB_URL = "https://yzumpycvoouplizzgxid.supabase.co"
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6dW1weWN2b291cGxpenpneGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5MTI4OTYsImV4cCI6MjA4MTQ4ODg5Nn0.G9KSUWz9CtQIVs7VUwkY8BvJ1LRV9QI9-V_23m2jKGI"
+        
+        const { createClient } = supabase
+        const client = createClient(SB_URL, SB_KEY)
+        let chartInstance = null;
+
+        async function cargarDatos() {
+            // 1. Pedir las ultimas 100 metricas a la base de datos
+            let { data: metricas, error } = await client
+                .from('metricas')
+                .select('*')
+                .order('created_at', { ascending: true })
+                .limit(100)
+
+            if (error) return console.error(error)
+
+            // 2. Calcular Promedios por VM
+            const promedios = {}
+            const contadores = {}
+            
+            metricas.forEach(m => {
+                if (!promedios[m.nombre_vm]) { promedios[m.nombre_vm] = 0; contadores[m.nombre_vm] = 0; }
+                promedios[m.nombre_vm] += m.cpu;
+                contadores[m.nombre_vm]++;
+            });
+
+            const htmlPromedios = Object.keys(promedios).map(vm => {
+                const avg = (promedios[vm] / contadores[vm]).toFixed(1);
+                return `
+                <div class="card">
+                    <h3>Promedio CPU (${vm})</h3>
+                    <div class="num">${avg}%</div>
+                    <small>Basado en últimos registros</small>
+                </div>`
+            }).join('');
+            
+            document.getElementById('promedios').innerHTML = htmlPromedios;
+
+            // 3. Generar Gráfica
+            generarGrafica(metricas);
+        }
+
+        function generarGrafica(datos) {
+            const ctx = document.getElementById('miGrafica').getContext('2d');
+            
+            // Agrupar datos por VM para la gráfica
+            const datasets = [];
+            const colores = ['#ff6384', '#36a2eb', '#4bc0c0'];
+            
+            // Obtener nombres unicos de VMs
+            const vms = [...new Set(datos.map(d => d.nombre_vm))];
+
+            vms.forEach((vm, index) => {
+                // Filtrar solo los datos de esta VM
+                const datosVM = datos.filter(d => d.nombre_vm === vm);
+                datasets.push({
+                    label: vm,
+                    data: datosVM.map(d => d.cpu), // Eje Y: CPU
+                    borderColor: colores[index % colores.length],
+                    fill: false,
+                    tension: 0.4
+                });
+            });
+
+            // Eje X: Horas
+            const labels = datos.filter(d => d.nombre_vm === vms[0]).map(d => 
+                new Date(d.created_at).toLocaleTimeString()
+            );
+
+            if (chartInstance) chartInstance.destroy(); // Borrar anterior si existe
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true, max: 100 } }
+                }
+            });
+        }
+
+        // Cargar al inicio
+        cargarDatos();
+    </script>
+</body>
+</html>
