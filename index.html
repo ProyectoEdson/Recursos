@@ -149,12 +149,11 @@
                 backgroundColor: 'transparent',
                 borderWidth: 2,
                 tension: 0.3,
-                pointRadius: 0, // Línea limpia sin puntos
+                pointRadius: 0,
                 pointHoverRadius: 6
             }
         });
 
-        // Eje X basado en tiempo
         const labels = data.filter(d => d.nombre_vm === vms[0]).map(d => new Date(d.created_at).toLocaleTimeString());
 
         if (globalChartRef) globalChartRef.destroy();
@@ -164,6 +163,7 @@
             data: { labels: labels, datasets: datasets },
             options: {
                 responsive: true,
+                animation: false, // <--- ESTA LÍNEA MAGICA ARREGLA EL BUG
                 interaction: { mode: 'index', intersect: false },
                 maintainAspectRatio: false,
                 scales: {
